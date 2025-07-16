@@ -1,3 +1,3 @@
 PORTFOLIO
 
-As a Computer Science Major this repository is dedicated to all the personal projects i have built using IDEs such as Google colab, VS code asn Jupyter notebok.
+As a Computer Science major, this repository is dedicated to all the personal projects I have built using IDEs such as Google Colab, VS Code, and Jupyter Notebook. I am especially interested in fintech and quantitative finance, and I enjoy exploring how technology can be applied to solve complex problems
