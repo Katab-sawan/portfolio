@@ -113,10 +113,14 @@ options_df.dropna(subset=['iv'], inplace=True)
 options_df['iv'] *= 100
 options_df['moneyness'] = options_df['strike'] / spot_price
 
-options_df[['delta', 'gamma', 'vega', 'theta', 'rho']] = options_df.apply(
+greeks_df = options_df.apply(
     lambda row: pd.Series(bs_greeks(spot_price, row['strike'], row['timeToExpiration'], r, row['iv'] / 100, q)),
     axis=1
 )
+
+greeks_df = greeks_df[['delta', 'gamma', 'vega', 'theta', 'rho']]  # Ensure column alignment
+options_df = pd.concat([options_df, greeks_df], axis=1)
+
 
 display_df = options_df.copy()
 Y = display_df['strike'].values if y_axis_option == 'Strike Price ($)' else display_df['moneyness'].values
