@@ -6,6 +6,6 @@ scipy
 plotly
 numpy
 pandas
-matplotlib
+matplotlib.pyplot
 scipy
 math
