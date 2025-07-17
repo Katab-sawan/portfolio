@@ -4,8 +4,3 @@ pandas
 numpy
 scipy
 plotly
-numpy
-pandas
-matplotlib.pyplot
-scipy
-math
