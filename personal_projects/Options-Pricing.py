@@ -1,120 +1,71 @@
-print("Hello, this is a placeholder for the Options Pricing project which will theoretically price Eurpoean options using Blach-Scholes and American options using the Binomial method.")
-from scipy.stats import norm
-from enum import Enum
-from abc import ABC, abstractmethod
-import math
+import streamlit as st
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.stats import norm
 from scipy.sparse import csc_matrix
-from scipy.stats import bernoulli
+import math
 
-# Black-Scholes Model for European Options
+st.title("Options Pricing App")
 
-class OPTION_TYPE(Enum):
-    CALL = "call"
-    PUT = "PUT"
+# Inputs
+st.sidebar.header("Parameters")
+S = st.sidebar.number_input("Spot Price (S)", value=100.0)
+K = st.sidebar.number_input("Strike Price (K)", value=100.0)
+T = st.sidebar.number_input("Time to Maturity (T in years)", value=1.0)
+r = st.sidebar.number_input("Risk-Free Rate (r)", value=0.05)
+sigma = st.sidebar.number_input("Volatility (sigma)", value=0.2)
+N = st.sidebar.slider("Steps in Binomial Tree", min_value=3, max_value=50, value=5)
 
-class EuropeanOptionModel(ABC):
+# Black-Scholes for European Options
+def black_scholes_call_put(S, K, T, r, sigma):
+    d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+    d2 = d1 - sigma * math.sqrt(T)
+    call = S * norm.cdf(d1) - K * math.exp(-r * T) * norm.cdf(d2)
+    put = K * math.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+    return call, put
 
-    def calculate_optio_price(self, option_type):
-        if option_type == OPTION_TYPE.CALL:
-            return self.calclulate_call_price()
-        elif option_type == OPTION_TYPE.PUT:
-            return self.calculate_put_price()
-        else:
-            return -1
-    @classmethod
-    @abstractmethod
-    def calculate_call_option_price(cls):
-        pass
+call_price, put_price = black_scholes_call_put(S, K, T, r, sigma)
+st.subheader("Black-Scholes European Option Pricing")
+st.write(f"Call Price: **{call_price:.4f}**")
+st.write(f"Put Price: **{put_price:.4f}**")
 
-    @classmethod
-    @abstractmethod
-    def calculate_put_option_price(cls):
-        pass
-
-class BlackScholesModel(EuropeanOptionModel):
-    def __init__(self, S, K, T, r, sigma):
-        self.S = S
-        self.K = K
-        self.T = T
-        self.r = r
-        self.sigma = sigma
-
-    def calculate_call_option_price(self):
-        d1 = (math.log(self.S / self.K) + (self.r + 0.5 * self.sigma ** 2) * self.T) / (self.sigma * math.sqrt(self.T))
-        d2 = d1 - self.sigma * math.sqrt(self.T)
-        return (self.S * norm.cdf(d1) - self.K * math.exp(-self.r * self.T) * norm.cdf(d2))
-
-    def calculate_put_option_price(self):
-        d1 = (math.log(self.S / self.K) + (self.r + 0.5 * self.sigma ** 2) * self.T) / (self.sigma * math.sqrt(self.T))
-        d2 = d1 - self.sigma * math.sqrt(self.T)
-        return (self.K * math.exp(-self.r * self.T) * norm.cdf(-d2) - self.S * norm.cdf(-d1))
+# Binomial model for American Call Option
+def binomial_tree_american_call(S, K, T, r, sigma, N):
+    dt = T / (N - 1)
+    u = np.exp(sigma * np.sqrt(dt))
+    d = 1 / u
+    p = (np.exp(r * dt) - d) / (u - d)
     
-model = BlackScholesModel(S=100, K=100, T=1, r=0.05, sigma=0.2)
-call = model.calculate_call_option_price()
-put = model.calculate_put_option_price()
-print(f"Call Option Price: {call}")
-print(f"Put Option Price: {put}")
-    
-# Binomial Model for American Options
+    stock_prices = csc_matrix((N, N))
+    call_prices = csc_matrix((N, N))
 
-S0 = 100
-t = 1
-u = 1.05
-d = 1/u
-p = 0.6
+    stock_prices[0, 0] = S
+    for i in range(1, N):
+        M = i + 1
+        stock_prices[i, 0] = d * stock_prices[i - 1, 0]
+        for j in range(1, M):
+            stock_prices[i, j] = u * stock_prices[i - 1, j - 1]
 
-S_u = u * S0
-S_d = d * S0
-K = 102.5
-r = 0.01
+    # At expiration
+    expiration = stock_prices[:, -1].toarray() - K
+    expiration = np.where(expiration >= 0, expiration, 0)
+    call_prices[-1, :] = expiration
 
-C_u = S_d - K
-C_d = 0
+    # Backward induction
+    for i in range(N - 2, -1, -1):
+        for j in range(i + 1):
+            call_prices[i, j] = np.exp(-r * dt) * (
+                (1 - p) * call_prices[i + 1, j] + p * call_prices[i + 1, j + 1]
+            )
 
-print(S_u, S_d)
+    return call_prices[0, 0], call_prices
 
-C = np.exp(-r * t) * (p*C_u + (1-p)*C_d)
-print(C)
-        
+binomial_price, call_matrix = binomial_tree_american_call(S, K, T, r, sigma, N)
+st.subheader("Binomial Model American Call Option")
+st.write(f"Price: **{binomial_price:.4f}**")
 
-
-N = 5
-
-t = 1
-t = t / (N-1)
-
-S0 = 100
-r = 0.01
-
-sigma = 0.04
-u = np.exp(sigma * np.sqrt(t))
-u = 1/d
-p = (np.exp(r*t) - d) / (u - d)
-
-stock_prices = csc_matrix((N,N))
-call_prices = csc_matrix((N,N))
-
-stock_prices[0,0] = S0
-
-for i in range(1,N):
-  M = i + 1
-  stock_prices[i,0] = d * stock_prices[i-1,0]
-  for j in range(1,M):
-    stock_prices[i,j] = u * stock_prices[i-1,j-1]
-
-expiration = stock_prices[:,-1].toarray() - K
-expiration_shape = (expiration.size, )
-expiration = np.where(expiration >= 0, expiration, 0)
-
-call_prices[-1,:] = expiration
-
-for i in range(N - 2, -1, -1):
-  for j in range(i+1):
-    call_prices[i,j] = np.exp(-r * t) * ((1-p) * call_prices[i+1,j] + p * call_prices[i+1,j+1])
-
-
-plt.spy(call_prices)
-print(call_prices[0,0])
+# Visualize
+fig, ax = plt.subplots()
+ax.spy(call_matrix, markersize=5)
+st.subheader("Call Option Pricing Matrix (Binomial)")
+st.pyplot(fig)
